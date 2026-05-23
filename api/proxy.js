@@ -18,30 +18,38 @@ module.exports = (req, res) => {
     return;
   }
 
-  // En Vercel, req.body viene parseado automáticamente si Content-Type es application/json.
-  // Re-serializamos a string para enviarlo al servidor destino.
-  const payloadString = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+  // Leemos el stream de la petición de forma cruda (raw)
+  let body = '';
+  req.on('data', chunk => body += chunk);
+  req.on('end', () => {
+    const options = {
+      hostname: 'observatic.ucol.mx',
+      path:     '/ia/ea/?ajax_openai_student=1',
+      method:   'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
 
-  const options = {
-    hostname: 'observatic.ucol.mx',
-    path:     '/ia/ea/?ajax_openai_student=1',
-    method:   'POST',
-    headers: {
-      'Content-Type':   'application/json',
-      'Content-Length': Buffer.byteLength(payloadString)
-    }
-  };
+    const proxyReq = https.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, { 'Content-Type': 'application/json' });
+      proxyRes.pipe(res);
+    });
 
-  const proxyReq = https.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, { 'Content-Type': 'application/json' });
-    proxyRes.pipe(res);
+    proxyReq.on('error', (e) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+
+    proxyReq.write(body);
+    proxyReq.end();
   });
+};
 
-  proxyReq.on('error', (e) => {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: e.message }));
-  });
-
-  proxyReq.write(payloadString);
-  proxyReq.end();
+// Desactivamos el bodyParser automático de Vercel para poder consumir el stream directamente
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
 };
