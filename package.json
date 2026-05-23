@@ -1,0 +1,10 @@
+{
+  "name": "ian-api-tester",
+  "version": "1.0.0",
+  "description": "API Tester for IAN",
+  "main": "proxy.js",
+  "scripts": {
+    "start": "node proxy.js",
+    "dev": "vercel dev"
+  }
+}
